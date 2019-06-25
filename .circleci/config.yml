@@ -46,7 +46,9 @@ jobs:
       # https://nose.readthedocs.io
       - run:
           name: run tests
-          command: ./integration.sh
+          command: |
+            . venv/bin/activate
+            ./integration.sh
 
       - store_artifacts:
           path: test-reports
