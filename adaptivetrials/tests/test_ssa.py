@@ -1,5 +1,9 @@
 """Test Stochastic Simulation Algorithm
 """
+import numpy as np
+
+#set random Seed
+np.random.seed(1199167)
 
 def test_a2b():
     """test N is conserved for A->B reaction.
