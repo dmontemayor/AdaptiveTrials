@@ -5,5 +5,6 @@ fi
 if [ -d "adaptivetrials/tests/__pycache__" ]; then
   rm -rf adaptivetrials/tests/__pycache__
 fi
+python setup.py install
 pylint adaptivetrials
 pytest
