@@ -12,6 +12,9 @@ def ssa(state, nmat, kvec, runtime=0, clamp=None):
 
     import numpy as np
 
+    #init exit error condition
+    ierr = 0
+
     #state defines N species
     nspec = len(state)
 
@@ -31,20 +34,22 @@ def ssa(state, nmat, kvec, runtime=0, clamp=None):
     dstate = np.subtract(nmat[nspec:, :], nmat[:nspec, :])
 
     #apply clamp where defined
-    if(clamp!=None):
+    if clamp is not None:
         #check clamp is defined for each Species
-        if(len(clamp)==nspec):
-            dstate[np.where(clamp),:] = 0
+        if len(clamp) == nspec:
+            dstate[np.where(clamp), :] = 0
         else:
             print("Warning: clamp does not conform to number of species.")
             print("Warning: ignoring clamp.")
+            #indicate warning with ierr
+            ierr = 1
 
     #init trajectory
     time = 0
     trajectory = np.vstack((state, time))
 
     #assert full stochiometry matrix conforms to N species and M rxns
-    if(np.shape(nmat)[0] != nspec*2 or np.shape(nmat)[1] != nrxn):
+    if np.shape(nmat)[0] != nspec*2 or np.shape(nmat)[1] != nrxn:
         print("ERROR ssa.py: full stochiometry matrix does not match number of species and rxns")
         return trajectory, 1
 
@@ -54,10 +59,7 @@ def ssa(state, nmat, kvec, runtime=0, clamp=None):
     #hard code max number of iterations
     maxcounter = 100000
     counter = 0
-    while time < runtime and continuesimulation and counter<maxcounter:
-
-        #increment counter
-        counter += 1
+    while continuesimulation:
 
         #calculate propensities
         #loop over reactions
@@ -81,9 +83,12 @@ def ssa(state, nmat, kvec, runtime=0, clamp=None):
         propensity_sum = np.sum(propensity)
 
         #stop simulation if no more reactions can occour
-        continuesimulation = False #default value
-        if(propensity_sum > 0):
+        if propensity_sum <= 0:
+            print("ssa propensity sum is zero - exiting simulation")
+            continuesimulation = False #default value
+            ierr = 1 #default value
 
+        else:
             #continue simulation
             continuesimulation = True
 
@@ -101,12 +106,25 @@ def ssa(state, nmat, kvec, runtime=0, clamp=None):
 
             #update time
             time = time + tau
+            #stop simulation if runtime is complete
+            if time >= runtime:
+                print("time=runtime")
+                continuesimulation = False
+                ierr = 0
 
             #append state to trajectory
             trajectory = np.hstack((trajectory, np.vstack((state, time))))
 
+        #increment counter
+        counter += 1
+        #stop simulation if max number of iterations reached
+        if counter >= maxcounter:
+            continuesimulation = False
+            print("max number of ssa iterations reached.")
+            #indicate warning with ierr
+            ierr = 1
 
-    return trajectory, 0
+    return trajectory, ierr
 
 def plottrajectory(trajectory):
     """ utility for visualizing trajectory returned by SSA
@@ -114,23 +132,23 @@ def plottrajectory(trajectory):
     #import matplotlib
     #matplotlib.use('TkAgg')
     import matplotlib.pyplot as plt
-    import numpy as np
+    #import numpy as np
 
-    def abline(slope, intercept):
-        """Plot a line from slope and intercept"""
-        axes = plt.gca()
-        x_vals = np.array(axes.get_xlim())
-        y_vals = intercept + slope * x_vals
-        plt.plot(x_vals, y_vals, '--')
+    #def abline(slope, intercept):
+    #    """Plot a line from slope and intercept"""
+    #    axes = plt.gca()
+    #    x_vals = np.array(axes.get_xlim())
+    #    y_vals = intercept + slope * x_vals
+    #    plt.plot(x_vals, y_vals, '--')
 
     #plt.scatter(*zip(*trajectory))
     #abline(1, 0)
     for i in range(trajectory.shape[0]-1):
-        plt.plot(trajectory[-1, :],trajectory[i, :], label=f"Species {i}")
+        plt.plot(trajectory[-1, :], trajectory[i, :], label=f"Species {i}")
     plt.legend()
     plt.show()
 
-def plotweightedvalue(trajectory,weight):
+def plotweightedvalue(trajectory, weight):
     """ utility for visualizing weighted value of trajectory returned by SSA
     """
     #import matplotlib
@@ -143,11 +161,15 @@ def plotweightedvalue(trajectory,weight):
     nspec = np.size(weight)
     weight = np.reshape(weight, (nspec, 1))
 
-    if isinstance(trajectory, (list,)):
-        for i in range(len(trajectory)):
-            plt.plot(trajectory[i][-1, :],weight.T.dot(trajectory[i][0:nspec,:]).T, label=f"trajectory {i}")
+    if isinstance(trajectory, (list, )):
+        #for i in range(len(trajectory)):
+        #    plt.plot(trajectory[i][-1, :], weight.T.dot(trajectory[i][0:nspec, :]).T, label=f"trajectory {i}")
+        for i, traj in enumerate(trajectory):
+            plt.plot(traj[-1, :], weight.T.dot(traj[0:nspec, :]).T,
+                     label=f"trajectory {i}")
     else:
-        plt.plot(trajectory[-1, :],weight.T.dot(trajectory[0:nspec,:]).T, label="Weighted Value")
+        plt.plot(trajectory[-1, :], weight.T.dot(trajectory[0:nspec, :]).T,
+                 label="Weighted Value")
 
     plt.legend()
     plt.show()

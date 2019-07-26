@@ -1,0 +1,3 @@
+layer,n,activation,lreg,regval
+0,5,linear,1,0
+1,3,linear,2,0.1
